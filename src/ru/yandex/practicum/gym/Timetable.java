@@ -1,101 +1,111 @@
 package ru.yandex.practicum.gym;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class Timetable {
 
-    private Map<DayOfWeek, List<TrainingSession>> timetable = new HashMap<>();
+    private static final Comparator<TrainingSession> BY_TIME =
+            Comparator.comparing(TrainingSession::getTimeOfDay);
+
+    // Нужен для быстрого получения всех занятий за конкретный день - O(1)
+    private final Map<DayOfWeek, List<TrainingSession>> sessionsByDay =
+            new HashMap<>();
+
+    // Нужен для быстрого поиска занятий по дню и времени - O(log n)
+    private final Map<DayOfWeek, TreeMap<TimeOfDay, List<TrainingSession>>> sessionsByDayAndTime =
+            new HashMap<>();
 
     public void addNewTrainingSession(TrainingSession trainingSession) {
-
         DayOfWeek dayOfWeek = trainingSession.getDayOfWeek();
+        TimeOfDay timeOfDay = trainingSession.getTimeOfDay();
 
-        if (!timetable.containsKey(dayOfWeek)) {
-            timetable.put(dayOfWeek, new ArrayList<>());
+        List<TrainingSession> sessions =
+                sessionsByDay.computeIfAbsent(
+                        dayOfWeek,
+                        day -> new ArrayList<>()
+                );
+
+        int insertionIndex =
+                Collections.binarySearch(
+                        sessions,
+                        trainingSession,
+                        BY_TIME
+                );
+
+        if (insertionIndex < 0) {
+            insertionIndex = -insertionIndex - 1;
+        } else {
+            while (
+                    insertionIndex < sessions.size()
+                            && BY_TIME.compare(
+                            sessions.get(insertionIndex),
+                            trainingSession
+                    ) == 0
+            ) {
+                insertionIndex++;
+            }
         }
 
-        timetable.get(dayOfWeek).add(trainingSession);
+        sessions.add(insertionIndex, trainingSession);
 
-        timetable.get(dayOfWeek).sort(
-                Comparator.comparing(TrainingSession::getTimeOfDay)
-        );
+        sessionsByDayAndTime
+                .computeIfAbsent(
+                        dayOfWeek,
+                        day -> new TreeMap<>()
+                )
+                .computeIfAbsent(
+                        timeOfDay,
+                        time -> new ArrayList<>()
+                )
+                .add(trainingSession);
     }
 
-    public List<TrainingSession> getTrainingSessionsForDay(DayOfWeek dayOfWeek) {
-        return timetable.getOrDefault(dayOfWeek, Collections.emptyList());
+    public List<TrainingSession> getTrainingSessionsForDay(
+            DayOfWeek dayOfWeek
+    ) {
+        return sessionsByDay.getOrDefault(
+                dayOfWeek,
+                Collections.emptyList()
+        );
     }
 
     public List<TrainingSession> getTrainingSessionsForDayAndTime(
             DayOfWeek dayOfWeek,
             TimeOfDay timeOfDay
     ) {
-        List<TrainingSession> sessions = timetable.get(dayOfWeek);
+        TreeMap<TimeOfDay, List<TrainingSession>> sessionsByTime =
+                sessionsByDayAndTime.get(dayOfWeek);
 
-        if (sessions == null) {
+        if (sessionsByTime == null) {
             return Collections.emptyList();
         }
 
-        int left = 0;
-        int right = sessions.size() - 1;
-
-        while (left <= right) {
-            int middle = (left + right) / 2;
-
-            TrainingSession session = sessions.get(middle);
-
-            int comparison = session.getTimeOfDay().compareTo(timeOfDay);
-
-            if (comparison < 0) {
-                left = middle + 1;
-            } else if (comparison > 0) {
-                right = middle - 1;
-            } else {
-                // нашли тренировку с нужным временем
-
-                List<TrainingSession> result = new ArrayList<>();
-
-                // идём влево от найденной тренировки
-                int index = middle;
-
-                while (index >= 0 &&
-                        sessions.get(index).getTimeOfDay().equals(timeOfDay)) {
-
-                    result.add(sessions.get(index));
-                    index--;
-                }
-
-                // переворачиваем, потому что шли справа налево
-                Collections.reverse(result);
-
-                // идём вправо
-                index = middle + 1;
-
-                while (index < sessions.size() &&
-                        sessions.get(index).getTimeOfDay().equals(timeOfDay)) {
-
-                    result.add(sessions.get(index));
-                    index++;
-                }
-
-                return result;
-            }
-        }
-
-        return Collections.emptyList();
+        return sessionsByTime.getOrDefault(
+                timeOfDay,
+                Collections.emptyList()
+        );
     }
 
     public List<CounterOfTrainings> getCountByCoaches() {
-
         Map<Coach, Integer> countByCoach = new HashMap<>();
 
-        for (List<TrainingSession> sessions : timetable.values()) {
+        for (List<TrainingSession> sessions : sessionsByDay.values()) {
             for (TrainingSession session : sessions) {
-
                 Coach coach = session.getCoach();
 
-                int currentCount = countByCoach.getOrDefault(coach, 0);
+                int currentCount =
+                        countByCoach.getOrDefault(coach, 0);
 
-                countByCoach.put(coach, currentCount + 1);
+                countByCoach.put(
+                        coach,
+                        currentCount + 1
+                );
             }
         }
 
@@ -110,13 +120,7 @@ public class Timetable {
             );
         }
 
-        result.sort(
-                (counter1, counter2) ->
-                        Integer.compare(
-                                counter2.getCount(),
-                                counter1.getCount()
-                        )
-        );
+        result.sort(CounterOfTrainings.BY_COUNT_DESCENDING);
 
         return result;
     }
