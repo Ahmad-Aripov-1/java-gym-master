@@ -2,17 +2,12 @@ package ru.yandex.practicum.gym;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 public class Timetable {
-
-    private static final Comparator<TrainingSession> BY_TIME =
-            Comparator.comparing(TrainingSession::getTimeOfDay);
-
     // Нужен для быстрого получения всех занятий за конкретный день - O(1)
     private final Map<DayOfWeek, List<TrainingSession>> sessionsByDay =
             new HashMap<>();
@@ -31,39 +26,15 @@ public class Timetable {
                         day -> new ArrayList<>()
                 );
 
-        int insertionIndex =
-                Collections.binarySearch(
-                        sessions,
-                        trainingSession,
-                        BY_TIME
-                );
+        sessions.add(trainingSession);
 
-        if (insertionIndex < 0) {
-            insertionIndex = -insertionIndex - 1;
-        } else {
-            while (
-                    insertionIndex < sessions.size()
-                            && BY_TIME.compare(
-                            sessions.get(insertionIndex),
-                            trainingSession
-                    ) == 0
-            ) {
-                insertionIndex++;
-            }
-        }
+        sessions.sort((session1, session2) ->
+                session1.getTimeOfDay()
+                        .compareTo(session2.getTimeOfDay())
+        );
 
-        sessions.add(insertionIndex, trainingSession);
-
-        sessionsByDayAndTime
-                .computeIfAbsent(
-                        dayOfWeek,
-                        day -> new TreeMap<>()
-                )
-                .computeIfAbsent(
-                        timeOfDay,
-                        time -> new ArrayList<>()
-                )
-                .add(trainingSession);
+        sessionsByDayAndTime.computeIfAbsent(dayOfWeek, day -> new TreeMap<>()).computeIfAbsent(timeOfDay,
+                        time -> new ArrayList<>()).add(trainingSession);
     }
 
     public List<TrainingSession> getTrainingSessionsForDay(
@@ -120,7 +91,7 @@ public class Timetable {
             );
         }
 
-        result.sort(CounterOfTrainings.BY_COUNT_DESCENDING);
+        Collections.sort(result);
 
         return result;
     }

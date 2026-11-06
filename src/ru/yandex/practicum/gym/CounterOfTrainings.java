@@ -1,15 +1,14 @@
 package ru.yandex.practicum.gym;
 
-import java.util.Comparator;
-
-public class CounterOfTrainings {
-
-    public static final Comparator<CounterOfTrainings> BY_COUNT_DESCENDING =
-            Comparator.comparingInt(CounterOfTrainings::getCount)
-                    .reversed();
+public class CounterOfTrainings implements Comparable<CounterOfTrainings> {
 
     private Coach coach;
     private int count;
+
+    @Override
+    public int compareTo(CounterOfTrainings other) {
+        return Integer.compare(other.count, this.count);
+    }
 
     public CounterOfTrainings(Coach coach, int count) {
         this.coach = coach;
