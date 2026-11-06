@@ -1,20 +1,98 @@
 package ru.yandex.practicum.gym;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class Timetable {
+    // Нужен для быстрого получения всех занятий за конкретный день - O(1)
+    private final Map<DayOfWeek, List<TrainingSession>> sessionsByDay =
+            new HashMap<>();
 
-    private /* как это хранить??? */ timetable;
+    // Нужен для быстрого поиска занятий по дню и времени - O(log n)
+    private final Map<DayOfWeek, TreeMap<TimeOfDay, List<TrainingSession>>> sessionsByDayAndTime =
+            new HashMap<>();
 
     public void addNewTrainingSession(TrainingSession trainingSession) {
-        //сохраняем занятие в расписании
+        DayOfWeek dayOfWeek = trainingSession.getDayOfWeek();
+        TimeOfDay timeOfDay = trainingSession.getTimeOfDay();
+
+        List<TrainingSession> sessions =
+                sessionsByDay.computeIfAbsent(
+                        dayOfWeek,
+                        day -> new ArrayList<>()
+                );
+
+        sessions.add(trainingSession);
+
+        sessions.sort((session1, session2) ->
+                session1.getTimeOfDay()
+                        .compareTo(session2.getTimeOfDay())
+        );
+
+        sessionsByDayAndTime.computeIfAbsent(dayOfWeek, day -> new TreeMap<>()).computeIfAbsent(timeOfDay,
+                        time -> new ArrayList<>()).add(trainingSession);
     }
 
-    public /* непонятно, что возвращать */ getTrainingSessionsForDay(DayOfWeek dayOfWeek) {
-        //как реализовать, тоже непонятно, но сложность должна быть О(1)
+    public List<TrainingSession> getTrainingSessionsForDay(
+            DayOfWeek dayOfWeek
+    ) {
+        return sessionsByDay.getOrDefault(
+                dayOfWeek,
+                Collections.emptyList()
+        );
     }
 
-    public /* непонятно, что возвращать */ getTrainingSessionsForDayAndTime(DayOfWeek dayOfWeek, TimeOfDay timeOfDay) {
-        //как реализовать, тоже непонятно, но сложность должна быть О(1)
+    public List<TrainingSession> getTrainingSessionsForDayAndTime(
+            DayOfWeek dayOfWeek,
+            TimeOfDay timeOfDay
+    ) {
+        TreeMap<TimeOfDay, List<TrainingSession>> sessionsByTime =
+                sessionsByDayAndTime.get(dayOfWeek);
+
+        if (sessionsByTime == null) {
+            return Collections.emptyList();
+        }
+
+        return sessionsByTime.getOrDefault(
+                timeOfDay,
+                Collections.emptyList()
+        );
+    }
+
+    public List<CounterOfTrainings> getCountByCoaches() {
+        Map<Coach, Integer> countByCoach = new HashMap<>();
+
+        for (List<TrainingSession> sessions : sessionsByDay.values()) {
+            for (TrainingSession session : sessions) {
+                Coach coach = session.getCoach();
+
+                int currentCount =
+                        countByCoach.getOrDefault(coach, 0);
+
+                countByCoach.put(
+                        coach,
+                        currentCount + 1
+                );
+            }
+        }
+
+        List<CounterOfTrainings> result = new ArrayList<>();
+
+        for (Map.Entry<Coach, Integer> entry : countByCoach.entrySet()) {
+            result.add(
+                    new CounterOfTrainings(
+                            entry.getKey(),
+                            entry.getValue()
+                    )
+            );
+        }
+
+        Collections.sort(result);
+
+        return result;
     }
 }
